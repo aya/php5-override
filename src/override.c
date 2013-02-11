@@ -51,7 +51,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <regex.h>
 
 ZEND_DECLARE_MODULE_GLOBALS(override)
-static int le_override;
 
 zend_function_entry override_functions[] = {
 	{NULL, NULL, NULL}
@@ -61,7 +60,7 @@ zend_module_entry override_module_entry = {
 #if ZEND_MODULE_API_NO >= 20010901
 	STANDARD_MODULE_HEADER,
 #endif
-	"override",
+	PHP_OVERRIDE_EXTNAME,
 	override_functions,
 	PHP_MINIT(override),
 	PHP_MSHUTDOWN(override),
@@ -69,7 +68,7 @@ zend_module_entry override_module_entry = {
 	PHP_RSHUTDOWN(override),
 	PHP_MINFO(override),
 #if ZEND_MODULE_API_NO >= 20010901
-	"1.0", /* module version number */
+	PHP_OVERRIDE_EXTVER, /* module version number */
 #endif
 	STANDARD_MODULE_PROPERTIES
 };
@@ -94,19 +93,28 @@ static void php_override_init_globals(zend_override_globals *override_globals)
 typedef char* string;
 #define false 0
 #define true 1
-int global_overridden = 0;
+
+/* counters */
+int global_overridden = 0; //FIXME: unused variable
 int global_eval = 0;
+
+/* prototype */
 void load_config(char *filename);
+
+/* Hash Table which hold trace of all our overrides */
 HashTable _replaced;
-void _replaced_destruct(void *pElement)
-{
-	efree(pElement);
-}
-static int processed = 0;
+
+/* flag that indicated if file config has been loaded (1=true, 0=false) */
+static unsigned short processed = 0;
+
+/* regexp const strings */
+const char REGEX_CLASS_WITH_FUNCTION[] = "^\\s*function\\s+([_a-zA-Z0-9]+)::[_a-zA-Z0-9]+\\s*(\\(|$)";
+const char REGEX_CLASS_WITHOUT_FUNCTION[] = "^\\s*([_a-zA-Z0-9]+)::[_a-zA-Z0-9]+\\s*(\\(|$)";
 
 // ======================== MODULE START ========================
 PHP_MINIT_FUNCTION(override)
 {
+	ZEND_INIT_MODULE_GLOBALS(override, php_override_init_globals, NULL);
 	REGISTER_INI_ENTRIES();
 	return SUCCESS;
 }
@@ -129,10 +137,9 @@ PHP_RINIT_FUNCTION(override)
 {
 	if( processed == 1 )
 		return SUCCESS;
-
 	if( override_globals.global_enabled > 0 && override_globals.global_config != NULL && strlen(override_globals.global_config) > 0 )
 	{
-		zend_hash_init(&_replaced, 200, NULL, _replaced_destruct, 0);
+		zend_hash_init(&_replaced, 0, NULL, NULL, 1);
 		srand(time(NULL)%5000);
 		load_config(override_globals.global_config);
 		processed = 1;
@@ -251,7 +258,7 @@ regex_t* regex_prepare(string pattern)
 	}
 }
 
-string regex_match(regex_t *regex, string subject)
+string regex_match(regex_t *regex, const string subject)
 {
 	int result = 0;
 	regmatch_t pmatch[2];
@@ -354,7 +361,7 @@ int zend_update_constructor(string class, zend_function *function)
 		return FAILURE;
 }
 
-void parse_function_name(string function_name, string *class, string *method)
+void parse_function_name(const string function_name, string *class, string *method)
 {
 	regex_t* regex;
 	
@@ -407,7 +414,7 @@ void parse_function_name(string function_name, string *class, string *method)
 	}
 }
 
-HashTable* get_function_table(string class)
+HashTable* get_function_table(const string class)
 {
 	zend_class_entry **class_code;
 
@@ -441,7 +448,7 @@ int method_exists(string class, string method)
 	}
 }
 
-int override_delete(string class, string method)
+int override_delete(const string class, const string method)
 {
 	HashTable *method_table = get_function_table(class);
 
@@ -573,7 +580,7 @@ void load_config(char *filename)
 	const char RENAME_FLAG = '#';
 	const char APPEND_FLAG = '+';
 	const char DELETE_FLAG = '-';
-	const char COMMENT_FLAG = ';';
+	//const char COMMENT_FLAG = ';'; //TODO remove or use it :)
 
 	f = fopen(filename, "r");
 	if( f == NULL )
@@ -582,7 +589,7 @@ void load_config(char *filename)
 
 	do
 	{
-		line = emalloc(5000);
+		line = (string) emalloc(5000);
 		if( fgets(line, 5000, f) == NULL )
 		{
 			efree(line);
@@ -590,8 +597,13 @@ void load_config(char *filename)
 		}
 
 		// trim end line
-		while( isspace(line[strlen(line)-1]) && strlen(line) > 0 )
-			line[strlen(line)-1] = '\0';
+		while( strlen(line) > 0 )
+		{
+			if( isspace(line[strlen(line)-1]) )
+				line[strlen(line)-1] = '\0';
+			else
+				break; // end of space tail trim
+		}
 
 		// empty line
 		if( strlen(line) <= 0 )

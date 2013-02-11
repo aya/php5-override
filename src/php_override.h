@@ -11,6 +11,9 @@
 #ifndef PHP_OVERRIDE_H
 #define PHP_OVERRIDE_H
 
+#define PHP_OVERRIDE_EXTNAME "override"
+#define PHP_OVERRIDE_EXTVER  "1.0"
+
 extern zend_module_entry override_module_entry;
 #define phpext_override_ptr &override_module_entry
 
@@ -43,4 +46,3 @@ ZEND_BEGIN_MODULE_GLOBALS(override)
 ZEND_END_MODULE_GLOBALS(override)
 
 #endif	/* PHP_OVERRIDE_H */
-
