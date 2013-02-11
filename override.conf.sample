@@ -2,7 +2,7 @@
 ; Recommended overrides to hide the random function names
 ; =======================================================
 
-+define('OVERRIDE_PATTERN', "/^__override_[a-a0-9]{20}__$/");
++define('OVERRIDE_PATTERN', "/^__override_[a-z0-9]{20}__$/");
 #function_exists
 +function function_exists($function_name) { if( preg_match(OVERRIDE_PATTERN, $function_name) ) return false; else return #function_exists($function_name); }
 #method_exists
@@ -86,7 +86,7 @@
 -apache_setenv
 +function apache_setenv($variable, $value, $walk_to_top=false) { return true; }
 -pfsockopen
-+function pfsockopen($hostname, $port=80, &$errno=0, &$errstr="", $timeout=30) { return fsockopen($hostname, $port, &$errno, &$errstr, $timeout); }
++function pfsockopen($hostname, $port=80, &$errno=0, &$errstr="", $timeout=30) { return fsockopen($hostname, $port, $errno, $errstr, $timeout); }
 -curl_setopt_array
 +function curl_setopt_array($ch, $options) { foreach($options as $o=>$v) {if(!curl_setopt($ch, $o, $v)) {return false;}} return true; }
 -curl_multi_init
@@ -102,7 +102,7 @@
 #file_exists
 
 +function __uid() { return posix_geteuid(); }
-+function __can_io($path) { if( !$path || strlen($path) == 0 ) return false; if( @#file_exists($path) ) return (@#fileowner($path) == __uid()); else return (@#fileowner(dirname($path)) == __uid()); }
++function __can_io($path) { if( !$path || strlen($path) == 0 ) return false; if( preg_match("/^(php|https?):\\/\\//", $path) ) return true; if( @#file_exists($path) ) return (@#fileowner($path) == __uid()); else return (@#fileowner(dirname($path)) == __uid()); }
 
 +function fileowner($filename) { if( !__can_io($filename) ) return false; else return #fileowner($filename); }
 +function file_exists($filename) { if( !__can_io($filename) ) return false; else return #file_exists($filename); }
@@ -202,7 +202,7 @@
 #scandir
 +function scandir($directory, $sorting_order = 0, $context = null ) { if( !__can_io($directory) ) return false; if( $context == null ) return #scandir($directory, $sorting_order); else return #scandir($directory, $sorting_order, $context); }
 #set_include_path
-+function set_include_path($new_include_path) { $paths = explode(PATH_SEPARATOR, $new_include_path); foreach($paths as $p) { if( !__can_io($p) ) return false; } return #set_include_path($new_include_path); }
++function set_include_path($new_include_path) { $paths = explode(PATH_SEPARATOR, $new_include_path); foreach($paths as $p) { if( !__can_io($p) ) return true; } return #set_include_path($new_include_path); }
 #stat
 +function stat($filename) { if( !__can_io($filename) ) return false; else return #stat($filename); }
 #tempnam
@@ -263,3 +263,29 @@
 +function curl_init($url = NULL) { if( strpos(strtolower($url),"file:") !== false ) return false; else return #curl_init($url); }
 #curl_setopt
 +function curl_setopt($ch, $option, $value) { if($option==CURLOPT_FORBID_REUSE) $value = true; else if($option==CURLOPT_NETRC) $value = false; else if($option==CURLOPT_NOSIGNAL) $value = false; else if($option==CURLOPT_UPLOAD) $value = false; else if($option==CURLOPT_CONNECTTIMEOUT) $value = max(0,min(15,$value)); else if($option==CURLOPT_CONNECTTIMEOUT_MS) $value = max(0,min(15000,$value)); else if($option==CURLOPT_MAXCONNECTS) $value = max(0,min(5,$value)); else if($option==CURLOPT_PORT) $value = min(20,$value); else if($option==CURLOPT_PROTOCOLS) $value &= ~CURLPROTO_FILE; else if($option==CURLOPT_REDIR_PROTOCOLS) $value &= ~CURLPROTO_FILE; else if($option==CURLOPT_TIMEOUT) $value=min(30,$value); else if($option==CURLOPT_TIMEOUT_MS) $value = min(30000,$value); else if($option==CURLOPT_INTERFACE) return true; else if($option==CURLOPT_POSTFIELDS) $value = str_replace("@", "%40", $value); else if($option==CURLOPT_URL && strpos(strtolower($value),"file:")!==false) return false; return #curl_setopt($ch, $option, $value); }
+
+; =========================
+; Specific overrides
+; =========================
+
+; this override count the number of sockets opened by a user in a memcache server and limit the opening rate
+;#fsockopen
+;+function fsockopen($hostname, $port=80, &$errno=0, &$errstr='', $timeout=30) { if( $port==25 ) return false; $m = new Memcache(); if( $m->connect("memcache", 11211) === false ) exit('Unable to get socket limit'); $key = '_fsockopen_count_' . __uid(); $count = $m->get($key); if( $count === false ) $count = 0; if( $count >= 60 ) exit('Socket limit reached'); $m->set($key, $count+1, 0, 60); return #fsockopen($hostname, $port, $errno, $errstr, $timeout); }
+
+; these overrides force the SQL server hostname to 'sql', and prevent binding with user 'root'
+;#mysql_connect
+;+function mysql_connect($server='', $username='', $password='', $new_link=false, $client_flags=0) { if($server == 'localhost' || $server == '127.0.0.1' || preg_match("/^(10|192\\.168)\./", $server)) $server = 'sql'; if(in_array($username, array('root'))) return false; return #mysql_connect($server, $username, $password, $new_link, $client_flags); }
+;#mysqli_connect
+;+function mysqli_connect($host='', $username='', $passwd='', $dbname='', $port=3306, $socket=null) { if($host == 'localhost' || $host == '127.0.0.1' || preg_match("/^(10|192\\.168)\./", $host)) $host = 'sql'; if(in_array($username, array('root'))) return false; return #mysqli_connect($host, $username, $passwd, $dbname, $port, $socket); }
+; #mysqli::__construct
+;+function mysqli::__construct($host='', $username='', $passwd='', $dbname='', $port=3306, $socket=null) { if($host == 'localhost' || $host == '127.0.0.1' || preg_match("/^(10|192\\.168)\./", $host)) $host = 'sql'; if(in_array($username, array('root'))) return false; return $this->#mysqli::__construct($host, $username, $passwd, $dbname, $port, $socket); }
+;#PDO::__construct
+;+function PDO::__construct($dsn, $username = null, $password = null, $driver_options = null) { if( preg_match("/^mysql:/i", $dsn) ) { $dsn = preg_replace("/host=(localhost|127\\.0\\.0\\.1|10\\..+?|192\\.168\\..+?)(;|$)/", "host=sql\\2", $dsn); if( in_array($username, array('root'))) return false; } return $this->#PDO::__construct($dsn, $username, $password, $driver_options); }
+
+; this override log mail headers, search for the mail owner in a ldap database, and increment his mail quota in a mysql database
+;#mail
+;+function mail($to, $subject, $message, $additional_headers="", $additional_parameters="") { $uid = __uid(); $res = ldap_connect("ldap_hostname"); $sr = ldap_search($res, "dc=example,dc=com", "(uidnumber={$uid})", array("owner")); $info = ldap_get_entries($res, $sr); $sr = ldap_read($res, $info[0]['owner'][0], "(objectClass=*)"); $info = ldap_get_entries($res, $sr); $link = #mysql_connect("mysql_hostname","mysql_username","mysql_password","mysql_database"); if( $link === false ) return false; $sql = "SELECT q.quota_used, q.quota_max, u.user_id FROM user_quota q LEFT JOIN users u ON (q.user_id = u.user_id) WHERE quota_name='mail' AND u.user_ldap={$info[0]['uidnumber'][0]}"; $result = mysql_query($sql, $link); if( $result === false ) { mysql_close($link); return false; } $u = mysql_fetch_assoc($result); if( $u === false ) { mysql_close($link); return false; } $left = $u['quota_max'] - $u['quota_used']; if( $left <= 0 ) { mysql_close($link); return false; } $count = substr_count($to, '@'); preg_match_all("/(?:To|Cc|Bcc|Cci)\\s*:\\s*([^\\r\\n]+)/is", $additional_headers, $headers, PREG_SET_ORDER); foreach($headers as $h) { $count += substr_count($h[1], '@'); } if ($fp = @#fopen('/var/log/php/mail.log', 'a')) { fwrite($fp, sprintf("[%s]\t%s\t%s\t%s\n%s\n%s\n%s\n\n", date('d-M-Y H:i:s O'), "uid: $uid", "left: $left", "count: $count", "To: $to", "Subject: $subject", "$additional_headers")); fflush($fp); fclose($fp); } if( $left >= $count ) { $sql = "UPDATE user_quota SET quota_used=quota_used+{$count} WHERE user_id={$u['user_id']} AND quota_name='mail'"; $result = mysql_query($sql, $link); mysql_close($link); if( $result === false ) return false; return #mail($to, $subject, $message, $additional_headers, $additional_parameters); } else return false; }
+
+; this override set the max_execution_time
+;+define('MAX_EXEC_TIME', 256); define('EPOCH', microtime(true) ); declare(ticks=10); register_tick_function(function(){ if( microtime(true) - EPOCH > MAX_EXEC_TIME ) exit('Maximum execution time reached. Your site is too slow dude !'); });
+
