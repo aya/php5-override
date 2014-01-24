@@ -23,7 +23,7 @@ The configuration file is loaded at request start and may :
 Each line in the config file is interpreted at a time. In order to reference a class method, use the static notation (class::method).
 The 'flag' (+-#) character indicates which action to take and must be the first character of the line, else the line is ignored.
 Both flags '-' and '#' should be followed only by a function or method name.
-The flag '+' may be followed by any valid PHP code on one single line.
+The flag '+' may be followed by any valid PHP code on one single line. Code may be split on multiple lines using a trailing backslash '\' just before the newline '\n' or '\r\n'.
 You may call a previousely renamed function by prepending the original function name with '#' in the eval'd code.
 For a call of a renamed class method, do not forget the '$this->' statement.
 Calls to renamed classes only work in this configuration file and not in regular user script.

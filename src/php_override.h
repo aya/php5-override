@@ -12,7 +12,7 @@
 #define PHP_OVERRIDE_H
 
 #define PHP_OVERRIDE_EXTNAME "override"
-#define PHP_OVERRIDE_EXTVER  "1.0"
+#define PHP_OVERRIDE_EXTVER  "1.1"
 
 extern zend_module_entry override_module_entry;
 #define phpext_override_ptr &override_module_entry

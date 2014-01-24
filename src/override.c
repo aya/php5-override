@@ -568,6 +568,76 @@ int override_eval(string code)
 	}
 }
 
+// ======================== I/O ========================
+string readline(FILE* f)
+{
+	string line = NULL;
+	string more = NULL;
+	int length = 5000;
+	int i = 0;
+	
+	if( f == NULL || feof(f) )
+		return NULL;
+	
+	line = (string) emalloc(length);
+	line[0] = '\0';
+	
+	while(true)
+	{
+		// realloc when there is few space left
+		if( length - strlen(line) < 10 )
+		{
+			length += 5000;
+			more = erealloc(line, length);
+			if( more == NULL )
+			{
+				efree(line);
+				return NULL;
+			}
+			line = more;
+		}
+		
+		if( fgets(line + strlen(line), length - strlen(line), f) == NULL )
+		{
+			efree(line);
+			return NULL;
+		}
+		
+		if( feof(f) )
+			break;
+		
+		// check for escaped newline
+		i = strlen(line);
+		if( line[i-1] == '\n' && line[i-2] == '\\' )
+		{
+			line[i-2] = '\n';
+			line[i-1] = '\0';
+		}
+		else if( line[i-1] == '\n' && line[i-2] == '\r' && line[i-3] == '\\' )
+		{
+			line[i-3] = '\r';
+			line[i-2] = '\n';
+			line[i-1] = '\0';
+		}
+		else
+			break;
+	}
+
+	return line;
+}
+
+void trim(string str)
+{
+	// trim end line
+	while( strlen(str) > 0 )
+	{
+		if( isspace(str[strlen(str)-1]) )
+			str[strlen(str)-1] = '\0';
+		else
+			break; // end of space tail trim
+	}
+}
+
 // ======================== LOAD CONFIG ========================
 void load_config(char *filename)
 {
@@ -580,7 +650,7 @@ void load_config(char *filename)
 	const char RENAME_FLAG = '#';
 	const char APPEND_FLAG = '+';
 	const char DELETE_FLAG = '-';
-	//const char COMMENT_FLAG = ';'; //TODO remove or use it :)
+	const char COMMENT_FLAG = ';';
 
 	f = fopen(filename, "r");
 	if( f == NULL )
@@ -589,31 +659,16 @@ void load_config(char *filename)
 
 	do
 	{
-		line = (string) emalloc(5000);
-		if( fgets(line, 5000, f) == NULL )
-		{
-			efree(line);
+		line = readline(f);
+		if( line == NULL )
 			break;
-		}
-
-		// trim end line
-		while( strlen(line) > 0 )
-		{
-			if( isspace(line[strlen(line)-1]) )
-				line[strlen(line)-1] = '\0';
-			else
-				break; // end of space tail trim
-		}
+		trim(line);
 
 		// empty line
 		if( strlen(line) <= 0 )
 		{
 			efree(line);
-
-			if( feof(f) )
-				break; // end of file so exit
-			else
-				continue; // not end of file so get next line
+			continue;
 		}
 
 		if( line[0] == RENAME_FLAG )
@@ -639,13 +694,22 @@ void load_config(char *filename)
 			if( line != NULL )
 				override_eval(line+1);
 		}
+		else if( line[0] == COMMENT_FLAG )
+		{
+			// this is a commented line
+			// so just ignore (or eventually do anything with it)
+		}
+		else
+		{
+			// this is NOT any recognized control character
+			// so either be loose (and ignore) or be strict (and throw error)
+		}
 		
 		if( line != NULL ) { efree(line); line = NULL; }
 		if( class != NULL ) { efree(class); class = NULL; }
 		if( method != NULL ) { efree(method); method = NULL; }
 
-	}while( !feof(f) );
+	}while( true );
 
 	fclose(f);
 }
-
