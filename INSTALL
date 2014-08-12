@@ -1,0 +1,54 @@
+    __________________________________________________________________
+
+Installing php5-override extension
+    __________________________________________________________________
+
+    * General Installation Considerations
+    * Compiling the extension on Linux or Unix systems
+    * Installation
+    * Problems?
+    __________________________________________________________________
+
+
+General Installation Considerations
+
+    Prerequisite knowledge and software for compiling :
+        * Basic Unix skills (being able to operate "make" and a C compiler)
+        * An ANSI C compiler
+
+    When building directly from Git sources you might also need :
+        * autoconf: 2.13+ (for PHP < 5.4.0), 2.59+ (for PHP >= 5.4.0)
+        * automake: 1.4+
+        * libtool: 1.4.x+ (except 1.4.2)
+        * flex: Version 2.5.4 (for PHP <= 5.2)
+        * bison: Version 1.28 (preferred), 1.35, or 1.75
+        * phpize
+
+    Debian GNU/Linux installation notes:
+        * php5-dev package is recommended in order to compile the php5-override extension
+
+    Compatibility:
+        * php5-override is compatible with all versions of PHP5
+     __________________________________________________________________
+
+Compiling on Linux or Unix systems
+
+1.  cd src
+2.  phpize
+3.  ./configure
+4.  make
+5.  make install
+
+     __________________________________________________________________
+
+Installation
+
+     The override extension is not enabled by default, so the override.so librarie must be enabled inside of your php.ini.
+
+     __________________________________________________________________
+
+Problems?
+
+    You should report bugs or installation problems at:
+    https://github.com/OlympeNetwork/php5-override/issues/new
+    or by mail: support at anotherservice.com
